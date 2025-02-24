@@ -56,7 +56,7 @@ class SteganografiController extends Controller
         }
 
         // Simpan nama file ke session untuk pesan sukses
-        session()->flash('success', 'Pesan berhasil diencode dan telah diunduh.');
+        session()->flash('success', 'The message has been successfully encoded and downloaded.');
 
         // download otomatis output encode dan hapus file nya di storage
         // return response()->download($outputPath)->deleteFileAfterSend(true);
