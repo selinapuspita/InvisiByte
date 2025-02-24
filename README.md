@@ -15,6 +15,7 @@ InvisiByte adalah aplikasi steganografi berbasis web yang memungkinkan pengguna 
 
 ## 🛠 Teknologi yang Digunakan
 - Laravel
+- Python
 - JavaScript
 - Bootstrap
 - SCSS
