@@ -10,109 +10,148 @@ use Symfony\Component\Process\Exception\ProcessFailedException;
 class SteganografiController extends Controller
 {
     public function encode(Request $request)
-    {
+{
+    \Log::info("Mulai proses encoding...");
+    \Log::info("Password untuk encoding: " . $request->password);
+
+    try {
         // Validasi input
         $request->validate([
             'image' => 'required|image|mimes:png',
             'message' => 'required|string',
         ]);
 
-        // Pastikan folder uploads ada
         Storage::makeDirectory('public/uploads');
 
-        // Buat nama file unik
         $fileName = time() . '_' . uniqid() . '.png';
-
         $filePath = $request->file('image')->storeAs('uploads', $fileName, 'public');
         $imageFullPath = storage_path("app/public/$filePath");
 
-        // dd($imageFullPath, file_exists($imageFullPath));
+        \Log::info("Gambar disimpan di: " . $imageFullPath);
 
-        // Nama output juga harus unik
+        // Kunci enkripsi
+        $encryptionKey = env('APP_KEY');
+        $cipher = 'aes-256-cbc';
+        $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length($cipher));
+
+        // Enkripsi pesan
+        $encryptedMessage = openssl_encrypt($request->message, $cipher, $encryptionKey, 0, $iv);
+        $encryptedMessageWithIV = base64_encode($iv . $encryptedMessage);
+
+        \Log::info("Pesan terenkripsi: " . $encryptedMessageWithIV);
+
         $outputFileName = 'output_' . time() . '_' . uniqid() . '.png';
         $outputPath = storage_path('app/public/uploads/' . $outputFileName);
 
+        \Log::info("Output file: " . $outputPath);
 
-        // Path Python dari .env (Pastikan ada di .env: PYTHON_PATH="C:\\path\\to\\python.exe")
         $pythonPath = env('PYTHON_PATH', 'python');
 
-        // Buat command
+        // Kirim pesan yang sudah dienkripsi ke Python
         $command = sprintf(
             '%s %s encode %s %s %s',
             escapeshellarg($pythonPath),
             escapeshellarg(base_path('python/steganografi.py')),
             escapeshellarg($imageFullPath),
-            escapeshellarg($request->message),
+            escapeshellarg($encryptedMessageWithIV),
             escapeshellarg($outputPath)
         );
 
-        // Jalankan proses
+        \Log::info("Perintah Python: " . $command);
+
         $process = Process::fromShellCommandline($command);
         $process->run();
 
-        // Cek apakah berhasil
         if (!$process->isSuccessful()) {
+            \Log::error("Python gagal: " . $process->getErrorOutput());
             throw new ProcessFailedException($process);
         }
+
+        \Log::info("Python sukses, hasil file: " . $outputPath);
 
         // Simpan nama file ke session untuk pesan sukses
         session()->flash('success', 'The message has been successfully encoded and downloaded.');
-
-        // download otomatis output encode dan hapus file nya di storage
-        // return response()->download($outputPath)->deleteFileAfterSend(true);
-
-        // download otomatis output
-        // return response()->download($outputPath);
-
-        // Kembalikan JSON Response dengan URL file hasil encode
-    return response()->json([
-        'success' => true,
-        'downloadUrl' => asset('storage/uploads/' . $outputFileName)
-    ]);
-
-
+        
+        return response()->json([
+            'success' => true,
+            'downloadUrl' => asset('storage/uploads/' . $outputFileName)
+        ]);
+    } catch (\Exception $e) {
+        \Log::error("Error di encode: " . $e->getMessage());
+        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
     }
+}
 
-    
 
 
     public function decode(Request $request)
-    {
-        // Validasi input
-        $request->validate([
-            'image' => 'required|image|mimes:png',
-        ]);
+{
+    $request->validate([
+        'image' => 'required|image|mimes:png',
+    ]);
 
-        // Pastikan folder uploads ada
-        Storage::makeDirectory('public/uploads');
-        
-        $fileName = time() . '_' . uniqid() . '.png';
+    \Log::info("=== DECODING MULAI ===");
 
-        $filePath = $request->file('image')->storeAs('uploads', $fileName, 'public');
-        $imageFullPath = storage_path("app/public/$filePath");
+    Storage::makeDirectory('public/uploads');
 
-        // Path Python dari .env
-        $pythonPath = env('PYTHON_PATH', 'python');
+    $fileName = time() . '_' . uniqid() . '.png';
+    $filePath = $request->file('image')->storeAs('uploads', $fileName, 'public');
+    $imageFullPath = storage_path("app/public/$filePath");
 
-        // Buat command
-        $command = sprintf(
-            '%s %s decode %s',
-            escapeshellarg($pythonPath),
-            escapeshellarg(base_path('python/steganografi.py')),
-            escapeshellarg($imageFullPath)
-        );
+    \Log::info("File gambar disimpan di: " . $imageFullPath);
 
-        // Jalankan proses
-        $process = Process::fromShellCommandline($command);
-        $process->run();
+    $pythonPath = env('PYTHON_PATH', 'python');
 
-        // Cek apakah berhasil
-        if (!$process->isSuccessful()) {
-            throw new ProcessFailedException($process);
-        }
+    $command = sprintf(
+        '%s %s decode %s',
+        escapeshellarg($pythonPath),
+        escapeshellarg(base_path('python/steganografi.py')),
+        escapeshellarg($imageFullPath)
+    );
 
-        return response()->json(['message' => trim($process->getOutput())]);
+    \Log::info("Perintah yang dijalankan: " . $command);
 
+    $process = Process::fromShellCommandline($command);
+    $process->run();
+
+    if (!$process->isSuccessful()) {
+        \Log::error("Error saat menjalankan script Python: " . $process->getErrorOutput());
+        throw new ProcessFailedException($process);
     }
+
+    // Pesan terenkripsi dikembalikan dari Python
+    $encryptedMessageWithIV = trim($process->getOutput());
+    \Log::info("Pesan terenkripsi dari gambar: " . $encryptedMessageWithIV);
+
+    // Dekripsi pesan
+    $encryptionKey = env('APP_KEY'); 
+    $cipher = 'aes-256-cbc';
+    $data = base64_decode($encryptedMessageWithIV);
+    
+    if (!$data) {
+        \Log::error("Gagal decode base64 dari pesan terenkripsi!");
+        return response()->json(['success' => false, 'message' => 'Gagal decode base64']);
+    }
+
+    $ivLength = openssl_cipher_iv_length($cipher);
+    $iv = substr($data, 0, $ivLength);
+    $encryptedMessage = substr($data, $ivLength);
+
+    \Log::info("IV: " . base64_encode($iv));
+    \Log::info("Pesan terenkripsi tanpa IV: " . base64_encode($encryptedMessage));
+
+    $decryptedMessage = openssl_decrypt($encryptedMessage, $cipher, $encryptionKey, 0, $iv);
+
+    if (!$decryptedMessage) {
+        \Log::error("Gagal mendekripsi pesan! Kunci mungkin salah.");
+        return response()->json(['success' => false, 'message' => 'Password salah atau terjadi kesalahan saat decoding.']);
+    }
+
+    \Log::info("Pesan setelah dekripsi: " . $decryptedMessage);
+
+    return response()->json(['success' => true, 'message' => $decryptedMessage]);
+}
+
+
 
 }

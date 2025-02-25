@@ -81,7 +81,7 @@
   <main class="main">
 
     <!-- Hero Section -->
-    <section id="hero" class="hero section" style="background-image: url('{{ asset('img/teshero.png') }}'); background-size: cover; background-position: center;">
+    <section id="hero" class="hero section" style="background-image: url('{{ asset('img/hero.png') }}'); background-size: cover; background-position: center;">
 
       <div id="hero-carousel" data-bs-interval="5000" class="container carousel carousel-fade" data-bs-ride="carousel">
         <div class="carousel-item active">
@@ -129,6 +129,10 @@
                     <label for="message" class="form-label">Your message:</label>
                     <input type="text" id="message" name="message" class="form-control" placeholder="Secret Message.." required>
                 </div>
+                <div class="mb-2">
+                  <label for="encodePassword" class="form-label">Enter Password:</label>
+                  <input type="password" id="encodePassword" name="password" class="form-control" placeholder="Enter encryption password" required>
+              </div>              
                 <div class="d-flex justify-content-center">
                     <button type="submit" class="btn w-50" style="background-color: #444444; color: white;">Encode</button>
                 </div>
@@ -146,6 +150,10 @@
                       <label for="decodeImage" class="form-label">Choose your image:</label>
                       <input type="file" id="decodeImage" name="image" class="form-control" required>
                   </div>
+                  <div class="mb-2">
+                    <label for="decodePassword" class="form-label">Enter Password:</label>
+                    <input type="password" id="decodePassword" name="password" class="form-control" placeholder="Enter decryption password" required>
+                </div>                
                   <div class="d-flex justify-content-center">
                       <button type="submit" class="btn w-50" style="background-color: #444444; color: white;">Decode</button>
                   </div>
@@ -196,62 +204,89 @@
   <div id="preloader"></div>
 
   {{--  SCRIPT UNTUK MENAMPILKAN PESAN SUCCESS dan DECODE --}}
-
   <script>
       document.getElementById('encodeForm').addEventListener('submit', function (e) {
-          e.preventDefault(); // Mencegah reload halaman
+      e.preventDefault(); // Mencegah reload halaman
 
-          let formData = new FormData(this);
+      let password = document.getElementById("encodePassword").value.trim();
+      if (!password) {
+          alert("Password harus diisi!");
+          return;
+      }
 
-          fetch('/encode', {
-              method: 'POST',
-              body: formData,
-              headers: {
-                  'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value
-              }
-          })
-          .then(response => response.json())
-          .then(data => {
-              if (data.success) {
-                  // Buat link download secara otomatis
-                  let a = document.createElement('a');
-                  a.href = data.downloadUrl;
-                  a.download = ''; // Biarkan kosong agar nama file dari server tetap
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
+      let formData = new FormData(this);
 
-                  // Redirect ke halaman utama setelah 2 detik
-                  setTimeout(() => {
-                      window.location.href = '/';
-                  }, 1000);
-              } else {
-                  alert("Terjadi kesalahan saat encoding.");
-              }
-          })
-          .catch(error => console.error('Error:', error));
+      // console.log("Password yang dikirim untuk encoding:", password);
+
+      formData.append("password", password); // Tambahkan password
+
+      fetch('/encode', {
+          method: 'POST',
+          body: formData,
+          headers: {
+              'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value
+          }
+      })
+      .then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              let a = document.createElement('a');
+              a.href = data.downloadUrl;
+              a.download = ''; // Biarkan nama file dari server tetap
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+
+              setTimeout(() => {
+                  window.location.href = '/';
+              }, 1000);
+          } else {
+              alert(data.error || "Terjadi kesalahan saat encoding.");
+          }
+      })
+      .catch(error => {
+          console.error('Error:', error);
+          alert("Terjadi kesalahan saat berkomunikasi dengan server.");
       });
-  </script>
+  });
 
-  <script>
-      document.getElementById('decodeForm').addEventListener('submit', function(event) {
-          event.preventDefault();
+  document.getElementById('decodeForm').addEventListener('submit', function(event) {
+      event.preventDefault();
 
-          let formData = new FormData(this);
+      let password = document.getElementById("decodePassword").value.trim();
+      if (!password) {
+          alert("Password harus diisi!");
+          return;
+      }
 
-          fetch('/decode', {
-              method: 'POST',
-              body: formData,
-              headers: {
-                  'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value
-              }
-          })
-          .then(response => response.json())
-          .then(data => {
+      let formData = new FormData(this);
+
+      // console.log("Password yang dikirim:", password);
+
+      formData.append("password", password); // Tambahkan password
+
+      fetch('/decode', {
+          method: 'POST',
+          body: formData,
+          headers: {
+              'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value
+          }
+      })
+      .then(response => response.json())
+      .then(data => {
+          if (data.success) {
               document.getElementById('decodedMessage').innerHTML = "Pesan Rahasia: " + data.message;
-          })
-          .catch(error => console.error('Error:', error));
+          } else {
+              alert(data.error || "Password salah atau terjadi kesalahan saat decoding.");
+          }
+      })
+      .catch(error => {
+          console.error('Error:', error);
+          alert("Terjadi kesalahan saat berkomunikasi dengan server.");
       });
+
+  });
+
   </script>
 
   <!-- Vendor JS Files -->

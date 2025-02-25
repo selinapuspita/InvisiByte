@@ -7,8 +7,8 @@ def encode(image_path, message, output_path):
     image_path = os.path.abspath(image_path)
     output_path = os.path.abspath(output_path)
     
-    print(f"Using image: {image_path}")
-    print(f"Saving to: {output_path}")
+    # print(f"Using image: {image_path}")
+    # print(f"Saving to: {output_path}")
 
     if not os.path.exists(image_path):
         print(f"Error: File {image_path} tidak ditemukan.")
