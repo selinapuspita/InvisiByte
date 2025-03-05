@@ -17,13 +17,17 @@ class SteganografiController extends Controller
     try {
         // Validasi input
         $request->validate([
-            'image' => 'required|image|mimes:png',
+            'image' => 'required|image|mimes:png,jpg,jpeg',
             'message' => 'required|string',
         ]);
 
         Storage::makeDirectory('public/uploads');
 
         $fileName = time() . '_' . uniqid() . '.png';
+
+        // $extension = $request->file('image')->getClientOriginalExtension();
+        // $fileName = time() . '_' . uniqid() . '.' . $extension;
+
         $filePath = $request->file('image')->storeAs('uploads', $fileName, 'public');
         $imageFullPath = storage_path("app/public/$filePath");
 
@@ -39,6 +43,9 @@ class SteganografiController extends Controller
         $encryptedMessageWithIV = base64_encode($iv . $encryptedMessage);
 
         \Log::info("Pesan terenkripsi: " . $encryptedMessageWithIV);
+
+        // $extension = $request->file('image')->getClientOriginalExtension();
+        // $outputFileName = 'output_' . time() . '_' . uniqid() . $extension;
 
         $outputFileName = 'output_' . time() . '_' . uniqid() . '.png';
         $outputPath = storage_path('app/public/uploads/' . $outputFileName);
@@ -87,12 +94,15 @@ class SteganografiController extends Controller
     public function decode(Request $request)
 {
     $request->validate([
-        'image' => 'required|image|mimes:png',
+        'image' => 'required|image|mimes:png,jpg,jpeg',
     ]);
 
     \Log::info("=== DECODING MULAI ===");
 
     Storage::makeDirectory('public/uploads');
+
+    // $extension = $request->file('image')->getClientOriginalExtension();
+    // $fileName = time() . '_' . uniqid() . $extension;
 
     $fileName = time() . '_' . uniqid() . '.png';
     $filePath = $request->file('image')->storeAs('uploads', $fileName, 'public');
